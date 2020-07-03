@@ -1,5 +1,7 @@
 #https://zairon.wordpress.com/2008/02/15/idc-script-and-stack-frame-variables-length/
 
+#NB: I'm not sure if set_name needs a mask for this script, if weird bugs pop up, that's one thing I was iffy about. 
+
 import idautils
 import idaapi
 import idc
@@ -34,7 +36,7 @@ def print_guid(guid):
     data += "{:#04x},".format(part3)
     data += ",".join(["{:#02x}".format(ord(_)) for _ in guid[8:]])
     data += ")"
-    print data
+    print(data)
 
 def function_stack_erased(func_ea):
     if func_ea.startEA in g_functions_stack:
@@ -45,7 +47,7 @@ def delete_all_function_stack_members(func_ea, force=False):
     if g_vars["ERASE_STACK_MEMBERS"] or force:
         members, base = retrieve_stack_members(func_ea)
         stack_id = idc.GetFrame(func_ea)
-        for k, v in members.items():
+        for k, v in list(members.items()):
             if k != base and "arg_" not in v:
                 idc.DelStrucMember(stack_id, k)
         g_functions_stack.add(func_ea.startEA)
@@ -68,26 +70,35 @@ def retrieve_stack_members(func_ea):
 
 
 def get_struct_idx(name):
-    for idx in range(1, idc.GetMaxLocalType()):
-        if name == idc.GetLocalTypeName(idx):
+    for idx in range(1, idc.get_ordinal_qty
+
+
+()):
+        if name == idc.get_numbered_type_name(idx):
             return idx
     return None
 
 def get_Tinfo_from_name(name):
     target_idx = 0
-    for idx in range(1, idc.GetMaxLocalType()):
-        if name in idc.GetLocalTypeName(idx):
+    for idx in range(1, idc.get_ordinal_qty
+
+
+()):
+        if name in idc.get_numbered_type_name(idx):
             target_idx = idx
             break
     if target_idx != 0:
         #idc.GetLocalType(target_idx,0)
-        return idc.GetLocalTinfo(target_idx)
+        return idc.get_local_tinfo(target_idx)
     return None
 
 def get_type_from_name(name):
     target_idx = 0
-    for idx in range(1, idc.GetMaxLocalType()):
-        if name in idc.GetLocalTypeName(idx):
+    for idx in range(1, idc.get_ordinal_qty
+
+
+()):
+        if name in idc.get_numbered_type_name(idx):
             target_idx = idx
             break
     if target_idx != 0:
@@ -95,19 +106,22 @@ def get_type_from_name(name):
     return None
 
 def get_local_type_idx(name):
-    for idx in range(1, idc.GetMaxLocalType()):
-        if name in idc.GetLocalTypeName(idx):
+    for idx in range(1, idc.get_ordinal_qty
+
+
+()):
+        if name in idc.get_numbered_type_name(idx):
             return idx
     return None
 
 def assign_struct_to_address(address, struct_name):
-    idc.ApplyType(address, get_Tinfo_from_name(struct_name))
+    idc.apply_type(address, get_Tinfo_from_name(struct_name))
     struct_id = idaapi.get_struc_id(struct_name)
     if struct_id != 0xffffffffffffffff:
         struct_size = idaapi.get_struc_size(struct_id)
         for i in range(struct_size):
-            idc.MakeUnkn(address+i, 0)
-        return idaapi.doStruct(address, struct_size, struct_id)
+            idc.del_items(address+i, 0)
+        return idaapi.create_struct(address, struct_size, struct_id)
     return False
 
 def find_function_arg(addr, mnemonic, operand, idx_operand):
@@ -120,31 +134,31 @@ def find_function_arg(addr, mnemonic, operand, idx_operand):
     :return: the address where the argument is being set
     """
     for _ in range(20): # looks up to 20 instructions behind
-        addr = idc.PrevHead(addr)
-        if idc.GetMnem(addr) == mnemonic and idc.GetOpnd(addr, idx_operand) == operand:
+        addr = idc.prev_head(addr)
+        if idc.print_insn_mnem(addr) == mnemonic and idc.print_operand(addr, idx_operand) == operand:
             return addr
     return None
 
 def find_function_arg_with_operand_value(addr, mnemonic, register, value, idx_operand):
     """
     00000000000167FC mov     [rsp+20h], rax
-    idc.GetOperandValue(0x167FC, 0) ==> 0x20
+    idc.get_operand_value(0x167FC, 0) ==> 0x20
     """
 
     for _ in range(20): # looks up to 20 instructions behind
-        addr = idc.PrevHead(addr)
-        if idc.GetMnem(addr) == mnemonic and register in idc.GetOpnd(addr, idx_operand)\
-                and idc.GetOperandValue(addr, idx_operand) == value:
+        addr = idc.prev_head(addr)
+        if idc.print_insn_mnem(addr) == mnemonic and register in idc.print_operand(addr, idx_operand)\
+                and idc.get_operand_value(addr, idx_operand) == value:
             return addr
     return None
 
 
 def find_wdf_callback_through_immediate(mnemonic, operand, val):
     for i in range(10):
-        addr, operand_ = idc.FindImmediate(idc.MinEA(), idc.SEARCH_DOWN|idc.SEARCH_NEXT, val)
+        addr, operand_ = idc.ida_search.find_imm(ida_ida.inf_get_min_ea(), idc.SEARCH_DOWN|idc.SEARCH_NEXT, val)
         if addr != idc.BADADDR:
             #print hex(addr), idc.GetDisasm(addr), "Operand ", operand_
-            if operand_ == operand and idc.GetMnem(addr) == mnemonic:
+            if operand_ == operand and idc.print_insn_mnem(addr) == mnemonic:
                 return addr
         else:
             break
@@ -161,7 +175,7 @@ def find_wdf_callback_through_immediate(mnemonic, operand, val):
             INIT:000000000000A129 call    cs:__guard_dispatch_icall
 
     3)  000000000002A50B mov     rax, cs:WDFFUNCTIONS
-        000000000002A528 call    qword ptr [rax+268h]
+        000000000002A528 call    get_qword ptr [rax+268h]
 """
 def list_xref_to_wdf_callback(function_offset):
     calls_to_pfn_list = []
@@ -196,8 +210,8 @@ def find_WdfDeviceInitSetIoInCallerContextCallback():
     if call_pfn != None:
         idc.OpStroffEx(call_pfn,0,(idaapi.get_struc_id("_WDFFUNCTIONS")),0)
         lea_addr = find_function_arg(call_pfn, "lea", "r8", 0)
-        EvtWdfIoInCallerContext = idc.GetOperandValue(lea_addr, 1)
-        idc.MakeName(EvtWdfIoInCallerContext, 'EvtWdfIoInCallerContext')
+        EvtWdfIoInCallerContext = idc.get_operand_value(lea_addr, 1)
+        idc.set_name(EvtWdfIoInCallerContext, 'EvtWdfIoInCallerContext')
 
 
 
@@ -226,11 +240,11 @@ def find_WdfDeviceCreateDeviceInterface():
 
     for k, pfn_call in enumerate(calls_to_pfn_list):
         lea_guid = find_function_arg(pfn_call, "lea", "r8", 0)
-        interface_guid = idc.GetOperandValue(lea_guid, 1)
-        idc.MakeName(interface_guid, '_InterfaceGUID' + str(k))
+        interface_guid = idc.get_operand_value(lea_guid, 1)
+        idc.set_name(interface_guid, '_InterfaceGUID' + str(k))
         assign_struct_to_address(interface_guid, "GUID")
         g_vars["_InterfaceGUID" + str(k)] = interface_guid
-        print("_InterfaceGUID: ", hex(interface_guid))
+        print(("_InterfaceGUID: ", hex(interface_guid)))
         guid_bytes = idc.GetManyBytes(interface_guid, 0x10)
         print_guid(guid_bytes)
 
@@ -253,26 +267,26 @@ def find_WdfDriverCreate():
     if call_pfnWdfDriverCreate != None:
         # First identify the RealDriverEntry :)
         current_func = idaapi.get_func(call_pfnWdfDriverCreate)
-        idc.MakeName(current_func.startEA, "_DriverEntry_")
+        idc.set_name(current_func.startEA, "_DriverEntry_")
 
         argument_DriverConfig_addr = find_function_arg_with_operand_value(call_pfnWdfDriverCreate, "mov", "rsp", 0x20, 0)
-        register_DriverConfig = idc.GetOpnd(argument_DriverConfig_addr, 1)
+        register_DriverConfig = idc.print_operand(argument_DriverConfig_addr, 1)
         lea_DriverConfig_addr = find_function_arg(argument_DriverConfig_addr, "lea", register_DriverConfig, 0)
 
         # Get stack and the stack operand offset
         current_func = idaapi.get_func(lea_DriverConfig_addr)
         stack_id = idc.GetFrame(current_func)
-        opnd = idc.GetOpnd(lea_DriverConfig_addr, 1)
+        opnd = idc.print_operand(lea_DriverConfig_addr, 1)
         if "rsp" in opnd:
-            stack_member_offset = idc.GetOperandValue(lea_DriverConfig_addr, 1)
+            stack_member_offset = idc.get_operand_value(lea_DriverConfig_addr, 1)
         elif "rbp" in opnd:
             var_x = opnd.split("+")[-1][:-1] # [rbp+57h+var_80] -> var_80
             members, _ = retrieve_stack_members(current_func)
-            inverted_members = {v:k for k, v in members.items()}
+            inverted_members = {v:k for k, v in list(members.items())}
             try:
                 stack_member_offset = inverted_members[var_x]
             except KeyError as msg:
-                print msg
+                print(msg)
                 return
 
         else:
@@ -324,7 +338,7 @@ def find_WdfIoQueueCreate():
         # Get stack and the stack operand offset
         current_func = idaapi.get_func(lea_argument_addr)
         stack_id = idc.GetFrame(current_func)
-        stack_member_offset = idc.GetOperandValue(lea_argument_addr, 1)
+        stack_member_offset = idc.get_operand_value(lea_argument_addr, 1)
 
         struct_id = idaapi.get_struc_id("_WDF_IO_QUEUE_CONFIG")
         struct_size = idc.GetStrucSize(struct_id)
@@ -342,7 +356,7 @@ def find_WdfIoQueueCreate():
                            stack_member_offset, idc.FF_BYTE|idc.FF_DATA,
                            -1, struct_size)
         idc.SetMemberType(stack_id, stack_member_offset, idc.FF_STRU|idc.FF_DATA, struct_id, 1)
-        print("IOQueue Creation at: " + hex(pfn_call))
+        print(("IOQueue Creation at: " + hex(pfn_call)))
 
 
 def find_WdfControlDeviceInitAllocate():
@@ -365,26 +379,26 @@ def find_WdfControlDeviceInitAllocate():
             idc.OpStroffEx(call_pfn,1,(idaapi.get_struc_id("_WDFFUNCTIONS")),0)
 
     lea_sddl = find_function_arg(call_pfn, "lea", "r8", 0)
-    unicode_sddl = idc.GetOperandValue(lea_sddl, 1)
-    idc.MakeName(unicode_sddl, 'control_device_sddl')
+    unicode_sddl = idc.get_operand_value(lea_sddl, 1)
+    idc.set_name(unicode_sddl, 'control_device_sddl')
     assign_struct_to_address(unicode_sddl, "_UNICODE_STRING")
-    print("Control Device SDDL at: ", hex(unicode_sddl))
+    print(("Control Device SDDL at: ", hex(unicode_sddl)))
 
 
 
 def assign_kmdf_structure_types(address):
     # Get the jmp to de import
-    jmp_import_ea = idautils.XrefsTo(address).next().frm
+    jmp_import_ea = idautils.XrefsTo(address).__next__().frm
     # There is only one XREF to WdfVersionBind
-    call_wdfVersionBind = idautils.XrefsTo(jmp_import_ea).next().frm
-    print(hex(call_wdfVersionBind))
+    call_wdfVersionBind = idautils.XrefsTo(jmp_import_ea).__next__().frm
+    print((hex(call_wdfVersionBind)))
     argument_WdfBindInfo = find_function_arg(call_wdfVersionBind, "lea", "r8", 0)
     if argument_WdfBindInfo is None:
         print("Error: Argument WdfBindInfo wasn't found!")
         return
-    wdfBindInfo = idc.GetOperandValue(argument_WdfBindInfo, 1)
-    idc.MakeName(wdfBindInfo, '_WdfBindInfo')
-    print("WdfBindInfo Struct: ", hex(wdfBindInfo))
+    wdfBindInfo = idc.get_operand_value(argument_WdfBindInfo, 1)
+    idc.set_name(wdfBindInfo, '_WdfBindInfo')
+    print(("WdfBindInfo Struct: ", hex(wdfBindInfo)))
     if not assign_struct_to_address(wdfBindInfo, "_WDF_BIND_INFO"):
         print("The _WDF_BIND_INFO struct wasn't found in the database")
         return
@@ -392,15 +406,15 @@ def assign_kmdf_structure_types(address):
 
     # Assign ComponentGlobals Name
     argument_WdfComponentGlobals = find_function_arg(call_wdfVersionBind, "lea", "r9", 0)
-    wdfComponentGlobals = idc.GetOperandValue(argument_WdfComponentGlobals, 1)
+    wdfComponentGlobals = idc.get_operand_value(argument_WdfComponentGlobals, 1)
     g_vars["_WDF_COMPONENT_GLOBALS"] = wdfComponentGlobals
-    idc.MakeName(wdfComponentGlobals, '_WdfComponentGlobals')
+    idc.set_name(wdfComponentGlobals, '_WdfComponentGlobals')
 
     # Now assign the WDFFUNCTIONS to FuncTable
-    wdfFunctions = idc.Qword(wdfBindInfo+0x20)
+    wdfFunctions = idc.get_qword(wdfBindInfo+0x20)
     g_vars["_WDFFUNCTIONS"] = wdfFunctions
     assign_struct_to_address(wdfFunctions, "_WDFFUNCTIONS")
-    idc.MakeName(wdfFunctions, 'g_WdfF_Functions')
+    idc.set_name(wdfFunctions, 'g_WdfF_Functions')
     #if not assign_struct_to_address(wdfFunctions, "_WDFFUNCTIONS"):
     #    print("The _WDFFUNCTIONS struct wasn't found in the database")
     #    return
@@ -410,9 +424,9 @@ def assign_kmdf_structure_types(address):
 # Callback to get the EA of WdfVersionBind
 def imp_cb(ea, name, ord):
     if not name:
-        print("%08x: ord#%d" % (ea, ord))
+        print(("%08x: ord#%d" % (ea, ord)))
     else:
-        print("%08x: %s (ord#%d)" % (ea, name, ord))
+        print(("%08x: %s (ord#%d)" % (ea, name, ord)))
     if name == "WdfVersionBind":
         assign_kmdf_structure_types(ea)
         return False
@@ -425,9 +439,13 @@ def imp_cb(ea, name, ord):
 def load_kmdf_types_into_idb():
     header_path = idautils.GetIdbDir()
     idaapi.idc_parse_types("".join([header_path, "WDFStructs.h"]), idc.PT_FILE)
-    for idx in range(1, idc.GetMaxLocalType()):
-        print(idx, idc.GetLocalTypeName(idx))
-        idc.Til2Idb(idx, idc.GetLocalTypeName(idx))
+    for idx in range(1, idc.get_ordinal_qty
+
+
+()):
+        #Fails to add some of the types
+        print((idx, idc.get_numbered_type_name(idx)))
+        idc.import_type(idx, idc.get_numbered_type_name(idx))
 
 ##############################################################################
 
@@ -448,21 +466,21 @@ if len(list_xref_to_wdf_callback(OFFSET_WdfIoQueueCreate)) == 0:
 if len(list_xref_to_wdf_callback(OFFSET_WdfDeviceInitSetIoIncallerContextCallback)) == 0:
     print("The driver is not setting an EvtInCallerContextCallback")
 for i in list_xref_to_wdf_callback(OFFSET_WdfRequestRetrieveInputMemory):
-    print "Call To WdfRequestRetrieveInputMemory: " + hex(i)
+    print("Call To WdfRequestRetrieveInputMemory: " + hex(i))
 for i in list_xref_to_wdf_callback(OFFSET_WdfRequestRetrieveOutputMemory):
-    print "Call To WdfRequestRetrieveOutputMemory: " + hex(i)
+    print("Call To WdfRequestRetrieveOutputMemory: " + hex(i))
 for i in list_xref_to_wdf_callback(OFFSET_WdfRequestRetrieveInputBuffer):
-    print "Call To WdfRequestRetrieveInputBuffer: " + hex(i)
+    print("Call To WdfRequestRetrieveInputBuffer: " + hex(i))
 for i in list_xref_to_wdf_callback(OFFSET_WdfRequestRetrieveOutputBuffer):
-    print "Call To WdfRequestRetrieveOutputBuffer: " + hex(i)
+    print("Call To WdfRequestRetrieveOutputBuffer: " + hex(i))
 for i in list_xref_to_wdf_callback(OFFSET_WdfRequestRetrieveInputWdmMdl):
-    print "Call To WdfRequestRetrieveInputWdmMdl: " + hex(i)
+    print("Call To WdfRequestRetrieveInputWdmMdl: " + hex(i))
 for i in list_xref_to_wdf_callback(OFFSET_WdfRequestRetrieveOutputWdmMdl):
-    print "Call To WdfRequestRetrieveOutputWdmMdl: " + hex(i)
+    print("Call To WdfRequestRetrieveOutputWdmMdl: " + hex(i))
 for i in list_xref_to_wdf_callback(OFFSET_WdfRequestRetrieveUnsafeUserInputBuffer):
-    print "Call To WdfRequestRetrieveUnsafeUserInputBuffer: " + hex(i)
+    print("Call To WdfRequestRetrieveUnsafeUserInputBuffer: " + hex(i))
 for i in list_xref_to_wdf_callback(OFFSET_WdfRequestRetrieveUnsafeUserOutputBuffer):
-    print "Call To WdfRequestRetrieveUnsafeUserOutputBuffer: " + hex(i)
+    print("Call To WdfRequestRetrieveUnsafeUserOutputBuffer: " + hex(i))
 
 
 def supress_exception(cb):
@@ -495,7 +513,7 @@ stack_id = idc.GetFrame(current_func)
 stack_struc = idaapi.get_struc(stack_id)
 
 # Get the stack operand offset value and stack member
-stack_member_offset = idc.GetOperandValue(lea_addr, 1)
+stack_member_offset = idc.get_operand_value(lea_addr, 1)
 stack_member = stack_struc.get_member(stack_member_offset)
 
 target_struct_id = idaapi.get_struc_id("_WDF_DRIVER_CONFIG")
